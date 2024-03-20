@@ -1,12 +1,9 @@
 import express from "express";
+import { error } from "node:console";
+import { Worker } from "node:worker_threads";
 
 const app = express();
 const PORT = process.env.PORT || 3002;
-
-const fibonacci = (n) => {
-  if (n <= 1) return n;
-  return fibonacci(n - 1) + fibonacci(n - 2);
-};
 
 app.get("/fibonacci/:n", (req, res) => {
   const n = parseInt(req.params.n);
@@ -14,11 +11,16 @@ app.get("/fibonacci/:n", (req, res) => {
     res.status(400).json({ error: "Invalid Input" });
     return;
   }
-  const startTime = process.hrtime();
-  const result = fibonacci(n);
-  const endTime = process.hrtime(startTime);
-  const executionTimeMs = (endTime[0] * 1000 + endTime[1] / 1e6).toFixed(3);
-  res.json({ fibonacci: result, executionTimeMs: executionTimeMs });
+
+  const worker = new Worker('./worker.js', {workerData:n})
+  worker.on('message', (result)=>{
+    res.json({fibonacci:result})
+  })
+ 
+  worker.on('error', (error)=>{
+    console.error('Worker error:', error);
+    res.status(500).json({error:"Internal Server Error"})
+  })
 });
 
 app.get("/non-blocking", (req, res) => {

@@ -1,26 +1,28 @@
 import express from "express";
-import { error } from "node:console";
-import { Worker } from "node:worker_threads";
+import workerpool from "workerpool";
+import { dirname } from "path";
+import { fileURLToPath } from "url";
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
-const PORT = process.env.PORT || 3002;
+const PORT = process.env.PORT || 3000 ;
 
-app.get("/fibonacci/:n", (req, res) => {
+const pool = workerpool.pool(__dirname + "/worker.js");
+
+app.get("/fibonacci/:n", async (req, res) => {
   const n = parseInt(req.params.n);
   if (isNaN(n) || n < 0) {
     res.status(400).json({ error: "Invalid Input" });
     return;
   }
 
-  const worker = new Worker('./worker.js', {workerData:n})
-  worker.on('message', (result)=>{
-    res.json({fibonacci:result})
-  })
- 
-  worker.on('error', (error)=>{
-    console.error('Worker error:', error);
-    res.status(500).json({error:"Internal Server Error"})
-  })
+  try {
+    const result = await pool.exec("fibonacci", [n]);
+    res.json({ fibonacci: result });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({error:"Internal server error"})
+  }
 });
 
 app.get("/non-blocking", (req, res) => {
